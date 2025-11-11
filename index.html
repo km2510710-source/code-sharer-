@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codesharer (GitHub Pages Version)</title>
+    <style>
+        :root {
+            --primary-color: #28a745; /* Green theme for the public version */
+            --secondary-color: #f8f9fa;
+            --border-color: #dee2e6;
+            --text-color: #333;
+            --bg-color: #fff;
+            --danger-color: #dc3545;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f9;
+        }
+        .container { width: 100%; height: 100%; display: flex; flex-direction: column; }
+        /* Login Screen */
+        #login-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; height: 100%; }
+        .login-box { background: var(--bg-color); padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; width: 320px; }
+        .login-box h1 { margin-top: 0; color: var(--text-color); }
+        .login-box p { font-size: 0.9em; color: #6c757d; }
+        .login-box input { width: calc(100% - 20px); padding: 10px; margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 6px; }
+        .login-box button { width: 100%; padding: 12px; border: none; border-radius: 6px; background-color: var(--primary-color); color: white; font-size: 16px; cursor: pointer; transition: background-color 0.3s; }
+        .login-box button:hover { background-color: #218838; }
+        /* Main App */
+        #main-app { display: none; flex-direction: column; width: 100%; height: 100%; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background-color: var(--bg-color); border-bottom: 1px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        header h2 { margin: 0; font-size: 1.2em; }
+        #leave-room-btn { padding: 8px 16px; border: 1px solid var(--danger-color); border-radius: 6px; background-color: transparent; color: var(--danger-color); cursor: pointer; transition: all 0.3s; }
+        #leave-room-btn:hover { background-color: var(--danger-color); color: white; }
+        .app-content { display: flex; flex: 1; overflow: hidden; }
+        #whiteboard-container { flex: 2; display: flex; flex-direction: column; border-right: 1px solid var(--border-color); }
+        #whiteboard-controls { padding: 10px; background-color: var(--secondary-color); }
+        canvas { background-color: #fff; cursor: crosshair; flex: 1; }
+        #chat-container { flex: 1; display: flex; flex-direction: column; background-color: var(--secondary-color); }
+        #messages { flex: 1; padding: 15px; overflow-y: auto; background-color: #fff; }
+        .message { margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; max-width: 90%; word-wrap: break-word; }
+        .message .username { font-weight: bold; font-size: 0.9em; margin-bottom: 4px; color: #333; }
+        .message.sent { background-color: var(--primary-color); color: white; align-self: flex-end; }
+        .message.sent .username { color: white; }
+        .message.received { background-color: #e9ecef; color: var(--text-color); align-self: flex-start; }
+        .message.info { background-color: #e9ecef; color: #6c757d; font-style: italic; text-align: center; align-self: center; font-size: 0.9em; }
+        #chat-input-area { display: flex; padding: 10px; border-top: 1px solid var(--border-color); background-color: var(--bg-color); }
+        #message-input { flex: 1; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; resize: none; }
+        #send-btn { width: 40px; height: 40px; margin-left: 10px; border: none; border-radius: 6px; background-color: var(--primary-color); color: white; cursor: pointer; font-size: 18px; display: flex; justify-content: center; align-items: center; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div id="login-screen">
+            <div class="login-box">
+                <h1>Codesharer</h1>
+                <p>GitHub Pages Version</p>
+                <input type="text" id="username-input" placeholder="사용자 이름">
+                <button id="join-room-btn">공용 작업실 입장</button>
+            </div>
+        </div>
+
+        <div id="main-app">
+            <header>
+                <h2 id="username-display"></h2>
+                <button id="leave-room-btn">나가기</button>
+            </header>
+            <div class="app-content">
+                <div id="whiteboard-container">
+                    <div id="whiteboard-controls">
+                        <label>색상: <input type="color" id="color-picker" value="#000000"></label>
+                        <label>굵기: <input type="range" id="line-width-picker" min="1" max="10" value="2"></label>
+                        <button id="clear-canvas-btn">전체 지우기</button>
+                    </div>
+                    <canvas id="whiteboard"></canvas>
+                </div>
+                <div id="chat-container">
+                    <div id="messages"></div>
+                    <div id="chat-input-area">
+                        <textarea id="message-input" placeholder="메시지 또는 코드 입력..." rows="1"></textarea>
+                        <button id="send-btn" title="전송">➤</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const loginScreen = document.getElementById('login-screen');
+        const mainApp = document.getElementById('main-app');
+        const joinRoomBtn = document.getElementById('join-room-btn');
+        const leaveRoomBtn = document.getElementById('leave-room-btn');
+        const usernameInput = document.getElementById('username-input');
+        const usernameDisplay = document.getElementById('username-display');
+        
+        const messagesContainer = document.getElementById('messages');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        const canvas = document.getElementById('whiteboard');
+        const ctx = canvas.getContext('2d');
+        const colorPicker = document.getElementById('color-picker');
+        const lineWidthPicker = document.getElementById('line-width-picker');
+        const clearCanvasBtn = document.getElementById('clear-canvas-btn');
+
+        // --- App State ---
+        let ws;
+        let username = '';
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        
+        // Using a free public WebSocket service
+        const WEBSOCKET_URL = 'wss://socketsbay.com/wss/v2/1/demo/';
+
+        // --- Functions ---
+
+        function showMainApp() {
+            username = usernameInput.value.trim();
+            if (!username) {
+                alert('사용자 이름을 입력해주세요.');
+                return;
+            }
+            usernameDisplay.textContent = `사용자: ${username}`;
+            loginScreen.style.display = 'none';
+            mainApp.style.display = 'flex';
+            resizeCanvas();
+            connectWebSocket();
+        }
+
+        function showLoginScreen() {
+            if (ws) {
+                ws.close();
+            }
+            mainApp.style.display = 'none';
+            loginScreen.style.display = 'flex';
+            usernameInput.value = '';
+            messagesContainer.innerHTML = '';
+        }
+
+        function connectWebSocket() {
+            ws = new WebSocket(WEBSOCKET_URL);
+
+            ws.onopen = () => {
+                console.log('Connected to public WebSocket server');
+                addInfoMessage('공용 작업실에 연결되었습니다.');
+                const joinInfo = { type: 'info', payload: { text: `'${username}'님이 입장했습니다.` } };
+                ws.send(JSON.stringify(joinInfo));
+            };
+
+            ws.onmessage = (event) => {
+                // SocketsBay sends back a string, not a JSON object directly
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    // Don't process messages sent by yourself
+                    if (data.payload && data.payload.username === username) {
+                        return;
+                    }
+
+                    switch (data.type) {
+                        case 'chat':
+                            addMessage(data.payload.text, 'received', data.payload.username);
+                            break;
+                        case 'draw':
+                            drawOnCanvas(data.payload);
+                            break;
+                        case 'clear':
+                            clearCanvas();
+                            break;
+                        case 'info':
+                            addInfoMessage(data.payload.text);
+                            break;
+                    }
+                } catch (e) {
+                    // Ignore non-JSON messages that SocketsBay might send on connect/disconnect
+                    console.log("Received non-JSON message: ", event.data);
+                }
+            };
+
+            ws.onclose = () => {
+                addInfoMessage('서버와 연결이 끊겼습니다.');
+            };
+
+            ws.onerror = (error) => {
+                addInfoMessage('오류가 발생했습니다. 콘솔을 확인해주세요.');
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        function addMessage(text, type, msgUsername) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', type);
+            
+            const userDiv = document.createElement('div');
+            userDiv.classList.add('username');
+            userDiv.textContent = msgUsername;
+            
+            const textDiv = document.createElement('div');
+            if (text.includes('\n')) {
+                textDiv.innerHTML = `<pre><code>${text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>`;
+            } else {
+                textDiv.textContent = text;
+            }
+            
+            messageDiv.appendChild(userDiv);
+            messageDiv.appendChild(textDiv);
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function addInfoMessage(text) {
+            const infoDiv = document.createElement('div');
+            infoDiv.classList.add('message', 'info');
+            infoDiv.textContent = text;
+            messagesContainer.appendChild(infoDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function handleSendMessage() {
+            const text = messageInput.value.trim();
+            if (text && ws && ws.readyState === WebSocket.OPEN) {
+                const message = { type: 'chat', payload: { text, username } };
+                ws.send(JSON.stringify(message));
+                addMessage(text, 'sent', username);
+                messageInput.value = '';
+                messageInput.style.height = 'auto';
+            }
+        }
+
+        function resizeCanvas() {
+            const container = document.getElementById('whiteboard-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight - document.getElementById('whiteboard-controls').offsetHeight;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const drawData = {
+                x0: lastX, y0: lastY,
+                x1: e.offsetX, y1: e.offsetY,
+                color: colorPicker.value,
+                width: lineWidthPicker.value,
+                username: username
+            };
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'draw', payload: drawData }));
+            }
+            drawOnCanvas(drawData);
+            [lastX, lastY] = [e.offsetX, e.offsetY];
+        }
+
+        function drawOnCanvas({ x0, y0, x1, y1, color, width }) {
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x1, y1);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.stroke();
+        }
+        
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function handleClearCanvas() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'clear', payload: { username } }));
+            }
+            clearCanvas();
+        }
+
+        // --- Event Listeners ---
+        joinRoomBtn.addEventListener('click', showMainApp);
+        leaveRoomBtn.addEventListener('click', showLoginScreen);
+        
+        sendBtn.addEventListener('click', handleSendMessage);
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+            }
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            [lastX, lastY] = [e.offsetX, e.offsetY];
+        });
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', () => isDrawing = false);
+        canvas.addEventListener('mouseout', () => isDrawing = false);
+        
+        clearCanvasBtn.addEventListener('click', handleClearCanvas);
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- Initial Setup ---
+        showLoginScreen();
+    </script>
+</body>
+</html>
